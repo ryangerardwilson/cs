@@ -1,0 +1,52 @@
+name: release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    env:
+      CS_REPO_OWNER: ${{ github.repository_owner }}
+      CS_REPO_NAME: ${{ github.event.repository.name }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build
+        run: make
+
+      - name: Package
+        shell: bash
+        run: |
+          set -euo pipefail
+          OS="$(uname -s)"
+          ARCH="$(uname -m)"
+          case "$OS" in
+            Linux) OS=linux ;;
+            Darwin) OS=darwin ;;
+          esac
+          case "$ARCH" in
+            x86_64) ARCH=amd64 ;;
+            aarch64|arm64) ARCH=arm64 ;;
+          esac
+          mkdir -p dist
+          ASSET="cs-${OS}-${ARCH}"
+          cp bin_cs "dist/${ASSET}"
+          chmod +x "dist/${ASSET}"
+          if command -v sha256sum >/dev/null 2>&1; then
+            sha256sum "dist/${ASSET}" > "dist/${ASSET}.sha256"
+          else
+            shasum -a 256 "dist/${ASSET}" > "dist/${ASSET}.sha256"
+          fi
+
+      - name: Publish release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true

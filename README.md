@@ -2,6 +2,12 @@
 
 Use C like a scripting language by compiling and running in one step.
 
+## Install
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | CS_REPO=<owner>/<repo> sh
+```
+
 ## Build
 
 ```sh
@@ -41,8 +47,18 @@ chmod +x test_hello.c
 - `--cache-dir <dir>`
 - `--no-cache`
 - `--verbose`
+- `-v, --version`
+- `-u, --update`
 - `--help`
-- `--version`
+
+## Versioning
+
+Update `VERSION` before tagging. Releases build on tags like `v0.1.1`.
+
+## Update
+
+`cs -u` uses GitHub Releases. Set `CS_REPO_OWNER` and `CS_REPO_NAME`, or
+`CS_REPO=owner/repo`.
 
 ## Helper header
 
