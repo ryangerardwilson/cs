@@ -31,8 +31,8 @@ CHECKSUM="${ASSET}.sha256"
 API="https://api.github.com/repos/${REPO}/releases/latest"
 
 JSON="$(curl -fsSL "$API")"
-URL="$(printf "%s" "$JSON" | grep -m1 "\"name\":\"${ASSET}\"" -A 2 | grep -m1 "browser_download_url" | sed -E 's/.*"([^"]+)".*/\1/')"
-CHECKSUM_URL="$(printf "%s" "$JSON" | grep -m1 "\"name\":\"${CHECKSUM}\"" -A 2 | grep -m1 "browser_download_url" | sed -E 's/.*"([^"]+)".*/\1/')"
+URL="$(printf "%s" "$JSON" | grep -m1 "\"name\"[[:space:]]*:[[:space:]]*\"${ASSET}\"" -A 2 | grep -m1 "browser_download_url" | sed -E 's/.*"([^"]+)".*/\1/')"
+CHECKSUM_URL="$(printf "%s" "$JSON" | grep -m1 "\"name\"[[:space:]]*:[[:space:]]*\"${CHECKSUM}\"" -A 2 | grep -m1 "browser_download_url" | sed -E 's/.*"([^"]+)".*/\1/')"
 
 if [ -z "$URL" ] || [ -z "$CHECKSUM_URL" ]; then
   echo "Release asset not found for ${ASSET}" >&2
