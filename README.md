@@ -1,6 +1,14 @@
 # cs
 
-Use C like a scripting language by compiling and running in one step.
+`cs` is for people who want to use C for real, everyday scripting tasks without
+falling back to Python/Node or brittle bash one-liners. It removes the
+compile/run friction so you can write small utilities in C, run them
+immediately, and build practical skills on real problems instead of getting
+stuck in leetcode-style exercises.
+
+If you're trying to improve at C by building quick tools that actually work,
+`cs` gives you the scripting ergonomics while keeping C's performance,
+portability, and single-binary output.
 
 ## Install
 
