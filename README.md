@@ -5,7 +5,7 @@ Use C like a scripting language by compiling and running in one step.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/install.sh | CS_REPO=<owner>/<repo> sh
+curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/cs/main/install.sh | CS_REPO=ryangerardwilson/cs sh
 ```
 
 ## Build
