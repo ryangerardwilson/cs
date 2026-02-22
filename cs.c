@@ -500,7 +500,8 @@ static bool completion_file_needs_update(const char *path) {
         return true;
     }
     bool ok = strstr(text, "complete -o filenames -F _cs_files cs") != NULL &&
-              strstr(text, "CS_HIDE_DOTFILES") != NULL;
+              strstr(text, "CS_HIDE_DOTFILES") != NULL &&
+              strstr(text, "CS_ONLY_C_FILES") != NULL;
     free(text);
     return !ok;
 }
@@ -540,7 +541,7 @@ static void ensure_completion_ready(void) {
 
     if (completion_file_needs_update(completion_file)) {
         const char *script =
-            "# cs bash completion (CS_HIDE_DOTFILES)\n"
+            "# cs bash completion (CS_HIDE_DOTFILES CS_ONLY_C_FILES)\n"
             "if [[ -z \"${CS_BASH_COMPLETION_ACTIVE:-}\" ]]; then\n"
             "    export CS_BASH_COMPLETION_ACTIVE=1\n"
             "fi\n"
@@ -560,10 +561,10 @@ static void ensure_completion_ready(void) {
             "        if (( hide_dotfiles )) && [[ \"$f_base\" == .* ]]; then\n"
             "            continue\n"
             "        fi\n"
-            "        if [[ -d \"$f\" || \"$f\" == *.c ]]; then\n"
+            "        if [[ \"$f\" == *.c ]]; then\n"
             "            COMPREPLY+=(\"$f\")\n"
             "        fi\n"
-            "    done < <(compgen -f -- \"$cur\")\n"
+            "    done < <(compgen -f -X '!*.c' -- \"$cur\")\n"
             "    return 0\n"
             "}\n"
             "\n"
