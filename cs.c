@@ -279,6 +279,17 @@ static bool write_text_file(const char *path, const char *text) {
     return written == len;
 }
 
+static bool append_text_file(const char *path, const char *text) {
+    FILE *file = fopen(path, "ab");
+    if (!file) {
+        return false;
+    }
+    size_t len = strlen(text);
+    size_t written = fwrite(text, 1, len, file);
+    fclose(file);
+    return written == len;
+}
+
 static char *json_find_string(const char *json, const char *key) {
     size_t key_len = strlen(key);
     size_t pattern_len = key_len + 4;
@@ -590,22 +601,24 @@ static void ensure_completion_ready(void) {
                                    ? bash_profile
                                    : (file_exists(profile) ? profile : bashrc));
 
-    fprintf(
-        stderr,
-        "cs bash completion is not active; continuing without completion.\n\n"
-        "Optional (recommended) setup:\n"
-        "1) Add this block to %s:\n"
-        "%s\n"
-        "if [ -f \"%s\" ]; then\n"
-        "    source \"%s\"\n"
-        "fi\n"
-        "%s\n\n"
-        "2) Reload your shell or run: source %s\n"
-        "3) Re-run: cs <file.c>\n"
-        "To skip this warning, set CS_SKIP_COMPLETION_CHECK=1.\n"
-        "Completion script location: %s\n",
-        target_rc, begin, completion_file, completion_file, end, target_rc,
-        completion_file);
+    char block[PATH_MAX * 2];
+    snprintf(block, sizeof(block),
+             "\n%s\nif [ -f \"%s\" ]; then\n    source \"%s\"\nfi\n%s\n", begin,
+             completion_file, completion_file, end);
+
+    if (!append_text_file(target_rc, block)) {
+        fprintf(
+            stderr,
+            "cs bash completion is not active; continuing without completion.\n"
+            "Failed to update %s.\n"
+            "Completion script location: %s\n",
+            target_rc, completion_file);
+        return;
+    }
+
+    fprintf(stderr,
+            "cs bash completion enabled. Reload your shell or run: source %s\n",
+            target_rc);
 }
 
 static int perform_update(const char *argv0, bool verbose) {
