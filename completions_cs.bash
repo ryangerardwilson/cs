@@ -25,9 +25,8 @@ _cs_complete() {
     return 0
   fi
 
-  COMPREPLY=( $(compgen -f -- "$cur") )
-  COMPREPLY=( $(printf '%s\n' "${COMPREPLY[@]}" | grep -E '\.c$') )
+  COMPREPLY=( $(compgen -f -X '!*.c' -- "$cur") )
   return 0
 }
 
-complete -F _cs_complete cs
+complete -o filenames -F _cs_complete cs
