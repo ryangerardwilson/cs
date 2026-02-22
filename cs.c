@@ -86,13 +86,32 @@ static bool file_exists(const char *path) {
 }
 
 static bool ensure_dir(const char *path) {
+    if (!path || path[0] == '\0') {
+        return false;
+    }
     if (dir_exists(path)) {
         return true;
     }
-    if (mkdir(path, 0755) == 0) {
+
+    char buffer[PATH_MAX];
+    snprintf(buffer, sizeof(buffer), "%s", path);
+
+    for (char *p = buffer + 1; *p; p++) {
+        if (*p == '/') {
+            *p = '\0';
+            if (!dir_exists(buffer)) {
+                if (mkdir(buffer, 0755) != 0 && errno != EEXIST) {
+                    return false;
+                }
+            }
+            *p = '/';
+        }
+    }
+
+    if (mkdir(buffer, 0755) == 0) {
         return true;
     }
-    return errno == EEXIST && dir_exists(path);
+    return errno == EEXIST && dir_exists(buffer);
 }
 
 static char *dup_string(const char *value) {
