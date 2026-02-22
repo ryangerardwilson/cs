@@ -30,35 +30,27 @@ ASSET="cs-${OS}-${ARCH}"
 CHECKSUM="${ASSET}.sha256"
 API="https://api.github.com/repos/${REPO}/releases/latest"
 
-JSON="$(curl -fsSL "$API")"
+API_URL="$API"
+TOKEN="${GITHUB_TOKEN:-${GH_TOKEN:-}}"
 
-extract_url() {
+SCRIPT_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/find-release-asset.py"
+
+fetch_url() {
   NAME="$1"
-  if command -v jq >/dev/null 2>&1; then
-    printf "%s" "$JSON" | jq -r --arg name "$NAME" '.assets[] | select(.name==$name) | .browser_download_url'
-    return
+  if [ -n "$TOKEN" ]; then
+    GITHUB_TOKEN="$TOKEN" curl -fsSL "$SCRIPT_URL" | GITHUB_TOKEN="$TOKEN" python3 - "$API_URL" "$NAME"
+  else
+    curl -fsSL "$SCRIPT_URL" | python3 - "$API_URL" "$NAME"
   fi
-
-  if command -v python3 >/dev/null 2>&1; then
-    printf "%s" "$JSON" | python3 - "$NAME" <<'PY'
-import json
-import sys
-
-name = sys.argv[1]
-data = json.load(sys.stdin)
-for asset in data.get("assets", []):
-    if asset.get("name") == name:
-        print(asset.get("browser_download_url", ""))
-        break
-PY
-    return
-  fi
-
-  printf "%s" "$JSON" | sed -E 's/\{/,\n\{/g' | grep -m1 "\"name\"[[:space:]]*:[[:space:]]*\"'"$NAME"'\"" -A 5 | grep -m1 "browser_download_url" | sed -E 's/.*"([^"]+)".*/\1/'
 }
 
-URL="$(extract_url "$ASSET")"
-CHECKSUM_URL="$(extract_url "$CHECKSUM")"
+if command -v python3 >/dev/null 2>&1; then
+  URL="$(fetch_url "$ASSET")"
+  CHECKSUM_URL="$(fetch_url "$CHECKSUM")"
+else
+  echo "python3 is required for install" >&2
+  exit 1
+fi
 
 if [ -z "$URL" ] || [ -z "$CHECKSUM_URL" ]; then
   echo "Release asset not found for ${ASSET}" >&2

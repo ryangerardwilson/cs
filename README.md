@@ -60,6 +60,11 @@ Update `VERSION` before tagging. Releases build on tags like `v0.1.1`.
 `cs -u` uses GitHub Releases. Set `CS_REPO_OWNER` and `CS_REPO_NAME`, or
 `CS_REPO=owner/repo`.
 
+## Install requirements
+
+`install.sh` requires `python3`. For private repos or rate-limited API calls,
+export `GITHUB_TOKEN` or `GH_TOKEN`.
+
 ## Helper header
 
 `cs.h` provides small utilities for file IO, process helpers, and directory listing.
