@@ -71,9 +71,7 @@ export `GITHUB_TOKEN` or `GH_TOKEN`.
 
 ## Bash completion
 
-```sh
-source completions_cs.bash
-```
+`cs` auto-generates a bash completion script in your config dir and prints
+instructions the first time it runs. Follow the printed block to enable it.
 
-To enable it permanently, copy `completions_cs.bash` into
-`~/.bash_completion` or `/etc/bash_completion.d/cs`.
+To skip the reminder, set `CS_SKIP_COMPLETION_CHECK=1`.

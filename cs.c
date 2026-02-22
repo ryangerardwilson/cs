@@ -268,6 +268,17 @@ static char *read_file_text(const char *path) {
     return buffer;
 }
 
+static bool write_text_file(const char *path, const char *text) {
+    FILE *file = fopen(path, "wb");
+    if (!file) {
+        return false;
+    }
+    size_t len = strlen(text);
+    size_t written = fwrite(text, 1, len, file);
+    fclose(file);
+    return written == len;
+}
+
 static char *json_find_string(const char *json, const char *key) {
     size_t key_len = strlen(key);
     size_t pattern_len = key_len + 4;
@@ -451,6 +462,150 @@ static bool copy_file(const char *src, const char *dst) {
     fclose(in);
     fclose(out);
     return true;
+}
+
+static const char *get_config_dir(void) {
+    const char *xdg = getenv("XDG_CONFIG_HOME");
+    if (xdg && xdg[0] != '\0') {
+        return xdg;
+    }
+    return getenv("HOME");
+}
+
+static bool file_contains_markers(const char *path, const char *begin,
+                                  const char *end) {
+    char *text = read_file_text(path);
+    if (!text) {
+        return false;
+    }
+    bool ok = strstr(text, begin) && strstr(text, end);
+    free(text);
+    return ok;
+}
+
+static bool completion_file_needs_update(const char *path) {
+    char *text = read_file_text(path);
+    if (!text) {
+        return true;
+    }
+    bool ok = strstr(text, "complete -o filenames -F _cs_files cs") != NULL &&
+              strstr(text, "CS_HIDE_DOTFILES") != NULL;
+    free(text);
+    return !ok;
+}
+
+static void ensure_completion_ready(void) {
+    const char *skip = getenv("CS_SKIP_COMPLETION_CHECK");
+    if (skip && strcmp(skip, "1") == 0) {
+        return;
+    }
+
+    const char *active = getenv("CS_BASH_COMPLETION_ACTIVE");
+    if (active && strcmp(active, "1") == 0) {
+        return;
+    }
+
+    const char *config_root = get_config_dir();
+    if (!config_root || config_root[0] == '\0') {
+        return;
+    }
+
+    char config_dir[PATH_MAX];
+    char completions_dir[PATH_MAX];
+    char completion_file[PATH_MAX];
+    if (getenv("XDG_CONFIG_HOME") && getenv("XDG_CONFIG_HOME")[0] != '\0') {
+        snprintf(config_dir, sizeof(config_dir), "%s/cs", config_root);
+    } else {
+        snprintf(config_dir, sizeof(config_dir), "%s/.config/cs", config_root);
+    }
+    snprintf(completions_dir, sizeof(completions_dir), "%s/completions",
+             config_dir);
+    snprintf(completion_file, sizeof(completion_file), "%s/cs.bash",
+             completions_dir);
+
+    if (!ensure_dir(completions_dir)) {
+        return;
+    }
+
+    if (completion_file_needs_update(completion_file)) {
+        const char *script =
+            "# cs bash completion (CS_HIDE_DOTFILES)\n"
+            "if [[ -z \"${CS_BASH_COMPLETION_ACTIVE:-}\" ]]; then\n"
+            "    export CS_BASH_COMPLETION_ACTIVE=1\n"
+            "fi\n"
+            "\n"
+            "_cs_files() {\n"
+            "    local cur=\"${COMP_WORDS[COMP_CWORD]}\"\n"
+            "    local cmd=\"${COMP_WORDS[0]##*/}\"\n"
+            "    local hide_dotfiles=1\n"
+            "    [[ \"$cur\" == .* ]] && hide_dotfiles=0\n"
+            "\n"
+            "    [[ \"$cmd\" == \"cs\" ]] || return 0\n"
+            "    [[ $COMP_CWORD -eq 1 ]] || return 0\n"
+            "\n"
+            "    COMPREPLY=()\n"
+            "    while IFS= read -r f; do\n"
+            "        local f_base=\"${f##*/}\"\n"
+            "        if (( hide_dotfiles )) && [[ \"$f_base\" == .* ]]; then\n"
+            "            continue\n"
+            "        fi\n"
+            "        if [[ -d \"$f\" || \"$f\" == *.c ]]; then\n"
+            "            COMPREPLY+=(\"$f\")\n"
+            "        fi\n"
+            "    done < <(compgen -f -- \"$cur\")\n"
+            "    return 0\n"
+            "}\n"
+            "\n"
+            "complete -o filenames -F _cs_files cs\n";
+
+        write_text_file(completion_file, script);
+    }
+
+    const char *begin = "# >>> cs bash completion >>>";
+    const char *end = "# <<< cs bash completion <<<";
+
+    const char *home = getenv("HOME");
+    if (!home || home[0] == '\0') {
+        return;
+    }
+
+    char bashrc[PATH_MAX];
+    char bash_profile[PATH_MAX];
+    char profile[PATH_MAX];
+    snprintf(bashrc, sizeof(bashrc), "%s/.bashrc", home);
+    snprintf(bash_profile, sizeof(bash_profile), "%s/.bash_profile", home);
+    snprintf(profile, sizeof(profile), "%s/.profile", home);
+
+    bool has_marker = file_contains_markers(bashrc, begin, end) ||
+                      file_contains_markers(bash_profile, begin, end) ||
+                      file_contains_markers(profile, begin, end);
+
+    if (has_marker) {
+        return;
+    }
+
+    const char *target_rc =
+        file_exists(bashrc) ? bashrc
+                            : (file_exists(bash_profile)
+                                   ? bash_profile
+                                   : (file_exists(profile) ? profile : bashrc));
+
+    fprintf(
+        stderr,
+        "cs bash completion is not active; continuing without completion.\n\n"
+        "Optional (recommended) setup:\n"
+        "1) Add this block to %s:\n"
+        "%s\n"
+        "if [ -f \"%s\" ]; then\n"
+        "    source \"%s\"\n"
+        "fi\n"
+        "%s\n\n"
+        "2) Reload your shell or run: source %s\n"
+        "3) Re-run: cs <file.c>\n"
+        "To skip this warning, set CS_SKIP_COMPLETION_CHECK=1.\n"
+        "Completion script location: %s\n",
+        target_rc, begin, completion_file, completion_file, end, target_rc,
+        completion_file);
 }
 
 static int perform_update(const char *argv0, bool verbose) {
@@ -768,6 +923,8 @@ int main(int argc, char **argv) {
             }
         }
     }
+
+    ensure_completion_ready();
 
     if (!source_path) {
         print_usage(stderr);
