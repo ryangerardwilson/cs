@@ -72,8 +72,8 @@ export `GITHUB_TOKEN` or `GH_TOKEN`.
 ## Bash completion
 
 ```sh
-source completions/cs.bash
+source completions_cs.bash
 ```
 
-To enable it permanently, copy `completions/cs.bash` into
+To enable it permanently, copy `completions_cs.bash` into
 `~/.bash_completion` or `/etc/bash_completion.d/cs`.
