@@ -22,12 +22,12 @@ curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/cs/main/install.sh
 make
 ```
 
-Binary: `bin_cs`
+Binary: `cs`
 
 ## Usage
 
 ```sh
-./bin_cs test_hello.c -- arg1 arg2
+cs test_hello.c -- arg1 arg2
 ```
 
 Enable shebang usage:
