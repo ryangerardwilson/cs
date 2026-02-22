@@ -68,3 +68,12 @@ export `GITHUB_TOKEN` or `GH_TOKEN`.
 ## Helper header
 
 `cs.h` provides small utilities for file IO, process helpers, and directory listing.
+
+## Bash completion
+
+```sh
+source completions/cs.bash
+```
+
+To enable it permanently, copy `completions/cs.bash` into
+`~/.bash_completion` or `/etc/bash_completion.d/cs`.
