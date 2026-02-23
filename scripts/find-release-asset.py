@@ -49,12 +49,14 @@ def fetch_release(api_url: str, token: str | None, max_attempts: int = 6) -> str
 
 
 def main() -> int:
-    if len(sys.argv) != 3:
-        sys.stderr.write("Usage: find-release-asset.py <api_url> <asset_name>\n")
+    if len(sys.argv) < 3:
+        sys.stderr.write(
+            "Usage: find-release-asset.py <api_url> <asset_name> [asset_name...]\n"
+        )
         return 1
 
     api_url = sys.argv[1]
-    asset_name = sys.argv[2]
+    asset_names = sys.argv[2:]
     token = os.environ.get("GITHUB_TOKEN") or os.environ.get("GH_TOKEN")
 
     payload = fetch_release(api_url, token)
@@ -67,16 +69,21 @@ def main() -> int:
     sys.stderr.write(f"Release tag: {release.get('tag_name', 'Unknown')}\n")
     sys.stderr.write(f"Number of assets: {len(release.get('assets', []))}\n")
 
-    for asset in release.get("assets", []):
-        if asset.get("name") == asset_name:
-            url = asset.get("browser_download_url", "")
-            if url:
-                print(url)
-                return 0
-            break
+    assets = {asset.get("name"): asset.get("browser_download_url", "")
+              for asset in release.get("assets", [])}
 
-    sys.stderr.write(f"Asset not found: {asset_name}\n")
-    return 1
+    missing = []
+    for name in asset_names:
+        url = assets.get(name, "")
+        if not url:
+            missing.append(name)
+        print(url)
+
+    if missing:
+        sys.stderr.write("Missing assets: " + ", ".join(missing) + "\n")
+        return 1
+
+    return 0
 
 
 if __name__ == "__main__":
