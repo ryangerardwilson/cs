@@ -481,22 +481,30 @@ static char *detect_os_arch(char *os, size_t os_len, char *arch,
     if (uname(&info) != 0) {
         return NULL;
     }
+    const char *os_src = info.sysname;
     if (strcmp(info.sysname, "Linux") == 0) {
-        snprintf(os, os_len, "linux");
+        os_src = "linux";
     } else if (strcmp(info.sysname, "Darwin") == 0) {
-        snprintf(os, os_len, "darwin");
-    } else {
-        snprintf(os, os_len, "%s", info.sysname);
+        os_src = "darwin";
     }
 
+    if (strlen(os_src) >= os_len) {
+        return NULL;
+    }
+    strcpy(os, os_src);
+
+    const char *arch_src = info.machine;
     if (strcmp(info.machine, "x86_64") == 0) {
-        snprintf(arch, arch_len, "amd64");
+        arch_src = "amd64";
     } else if (strcmp(info.machine, "aarch64") == 0 ||
                strcmp(info.machine, "arm64") == 0) {
-        snprintf(arch, arch_len, "arm64");
-    } else {
-        snprintf(arch, arch_len, "%s", info.machine);
+        arch_src = "arm64";
     }
+
+    if (strlen(arch_src) >= arch_len) {
+        return NULL;
+    }
+    strcpy(arch, arch_src);
     return os;
 }
 
@@ -574,15 +582,32 @@ static void ensure_completion_ready(void) {
     char config_dir[PATH_MAX];
     char completions_dir[PATH_MAX];
     char completion_file[PATH_MAX];
+    const char *config_suffix = ".config/cs";
     if (getenv("XDG_CONFIG_HOME") && getenv("XDG_CONFIG_HOME")[0] != '\0') {
-        snprintf(config_dir, sizeof(config_dir), "%s/cs", config_root);
-    } else {
-        snprintf(config_dir, sizeof(config_dir), "%s/.config/cs", config_root);
+        config_suffix = "cs";
     }
-    snprintf(completions_dir, sizeof(completions_dir), "%s/completions",
-             config_dir);
-    snprintf(completion_file, sizeof(completion_file), "%s/cs.bash",
-             completions_dir);
+
+    size_t config_needed = strlen(config_root) + 1 + strlen(config_suffix) + 1;
+    if (config_needed > sizeof(config_dir)) {
+        return;
+    }
+    strcpy(config_dir, config_root);
+    strcat(config_dir, "/");
+    strcat(config_dir, config_suffix);
+
+    size_t completions_needed = strlen(config_dir) + strlen("/completions") + 1;
+    if (completions_needed > sizeof(completions_dir)) {
+        return;
+    }
+    strcpy(completions_dir, config_dir);
+    strcat(completions_dir, "/completions");
+
+    size_t completion_needed = strlen(completions_dir) + strlen("/cs.bash") + 1;
+    if (completion_needed > sizeof(completion_file)) {
+        return;
+    }
+    strcpy(completion_file, completions_dir);
+    strcat(completion_file, "/cs.bash");
 
     if (!ensure_dir(completions_dir)) {
         return;
@@ -651,10 +676,29 @@ static void ensure_completion_ready(void) {
                                    ? bash_profile
                                    : (file_exists(profile) ? profile : bashrc));
 
+    const char *prefix = "\n";
+    const char *if_start = "\nif [ -f \"";
+    const char *if_mid = "\" ]; then\n    source \"";
+    const char *if_end = "\"\nfi\n";
+    const char *suffix = "\n";
+    size_t block_needed = strlen(prefix) + strlen(begin) + strlen(if_start) +
+                          strlen(completion_file) + strlen(if_mid) +
+                          strlen(completion_file) + strlen(if_end) +
+                          strlen(end) + strlen(suffix) + 1;
     char block[PATH_MAX * 2];
-    snprintf(block, sizeof(block),
-             "\n%s\nif [ -f \"%s\" ]; then\n    source \"%s\"\nfi\n%s\n", begin,
-             completion_file, completion_file, end);
+    if (block_needed > sizeof(block)) {
+        return;
+    }
+    block[0] = '\0';
+    strcat(block, prefix);
+    strcat(block, begin);
+    strcat(block, if_start);
+    strcat(block, completion_file);
+    strcat(block, if_mid);
+    strcat(block, completion_file);
+    strcat(block, if_end);
+    strcat(block, end);
+    strcat(block, suffix);
 
     if (!append_text_file(target_rc, block)) {
         fprintf(
@@ -719,8 +763,8 @@ static int perform_update(const char *argv0, bool verbose) {
         }
     }
 
-    char os[32];
-    char arch[32];
+    char os[64];
+    char arch[64];
     if (!detect_os_arch(os, sizeof(os), arch, sizeof(arch))) {
         fprintf(stderr, "Failed to detect platform\n");
         free(tag);
@@ -728,10 +772,25 @@ static int perform_update(const char *argv0, bool verbose) {
         return 1;
     }
 
-    char asset_name[128];
-    char checksum_name[160];
-    snprintf(asset_name, sizeof(asset_name), "cs-%s-%s", os, arch);
-    snprintf(checksum_name, sizeof(checksum_name), "%s.sha256", asset_name);
+    char asset_name[256];
+    char checksum_name[320];
+    int asset_written =
+        snprintf(asset_name, sizeof(asset_name), "cs-%s-%s", os, arch);
+    if (asset_written < 0 || (size_t)asset_written >= sizeof(asset_name)) {
+        fprintf(stderr, "Platform string too long\n");
+        free(tag);
+        free(json);
+        return 1;
+    }
+    int checksum_written =
+        snprintf(checksum_name, sizeof(checksum_name), "%s.sha256", asset_name);
+    if (checksum_written < 0 ||
+        (size_t)checksum_written >= sizeof(checksum_name)) {
+        fprintf(stderr, "Checksum name too long\n");
+        free(tag);
+        free(json);
+        return 1;
+    }
 
     char *asset_url = json_find_asset_url(json, asset_name);
     char *checksum_url = json_find_asset_url(json, checksum_name);
