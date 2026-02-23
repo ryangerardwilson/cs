@@ -55,12 +55,12 @@ chmod +x test_hello.c
 
 ## Versioning
 
-Update `VERSION` before tagging. Releases build on tags like `v0.1.1`.
+Release builds use the git tag as the version (tags like `v0.1.1`).
 
 ## Update
 
-`cs -u` uses GitHub Releases. Set `CS_REPO_OWNER` and `CS_REPO_NAME`, or
-`CS_REPO=owner/repo`.
+`cs -u` runs the GitHub install script under the hood. Set `CS_REPO_OWNER`
+and `CS_REPO_NAME`, or `CS_REPO=owner/repo`.
 
 ## Install requirements
 
@@ -73,7 +73,7 @@ export `GITHUB_TOKEN` or `GH_TOKEN`.
 
 ## Bash completion
 
-`cs` auto-generates a bash completion script in your config dir and prints
-instructions the first time it runs. Follow the printed block to enable it.
+`cs` auto-generates a bash completion script in your config dir and adds a
+source block to your shell rc file the first time it runs.
 
-To skip the reminder, set `CS_SKIP_COMPLETION_CHECK=1`.
+To skip this behavior, set `CS_SKIP_COMPLETION_CHECK=1`.
