@@ -49,15 +49,9 @@ chmod +x test_hello.c
 
 ## Options
 
-- `--cc <compiler>`
-- `--cflags <flags>`
-- `--ldflags <flags>`
-- `--cache-dir <dir>`
-- `--no-cache`
-- `--verbose`
 - `-v, --version`
 - `-u, --update`
-- `--help`
+- `-h, --help`
 
 ## Versioning
 

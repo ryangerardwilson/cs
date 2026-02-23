@@ -28,19 +28,12 @@
 #endif
 
 static void print_usage(FILE *out) {
-    fprintf(out,
-            "Usage: cs [options] <file.c> [--] [args...]\n"
-            "\n"
-            "Options:\n"
-            "  --cc <compiler>       Compiler to use (default: cc)\n"
-            "  --cflags <flags>      Extra compiler flags (can repeat)\n"
-            "  --ldflags <flags>     Extra linker flags (can repeat)\n"
-            "  --cache-dir <dir>     Cache directory override\n"
-            "  --no-cache            Disable cache\n"
-            "  -u, --update          Update cs to latest release\n"
-            "  --verbose             Print compile command and cache info\n"
-            "  -v, --version         Print version\n"
-            "  --help                Show this help\n");
+    fprintf(out, "Usage: cs [options] <file.c> [--] [args...]\n"
+                 "\n"
+                 "Options:\n"
+                 "  -u, --update          Update cs to latest release\n"
+                 "  -v, --version         Print version\n"
+                 "  -h, --help            Show this help\n");
 }
 
 static uint64_t fnv1a_update(uint64_t hash, const void *data, size_t len) {
@@ -591,8 +584,7 @@ static void ensure_completion_ready(void) {
             target_rc);
 }
 
-static int perform_update(const char *argv0, bool verbose) {
-    (void)argv0;
+static int perform_update(void) {
     const char *owner = getenv("CS_REPO_OWNER");
     const char *repo = getenv("CS_REPO_NAME");
     if (!owner || owner[0] == '\0') {
@@ -625,9 +617,6 @@ static int perform_update(const char *argv0, bool verbose) {
     if (!json) {
         fprintf(stderr,
                 "Unable to determine latest version; attempting upgrade...\n");
-        if (verbose) {
-            fprintf(stderr, "%s\n", cmd);
-        }
         return system(cmd);
     }
 
@@ -636,9 +625,6 @@ static int perform_update(const char *argv0, bool verbose) {
         fprintf(stderr,
                 "Unable to determine latest version; attempting upgrade...\n");
         free(json);
-        if (verbose) {
-            fprintf(stderr, "%s\n", cmd);
-        }
         return system(cmd);
     }
 
@@ -657,10 +643,6 @@ static int perform_update(const char *argv0, bool verbose) {
         }
     }
 
-    if (verbose) {
-        fprintf(stderr, "%s\n", cmd);
-    }
-
     printf("Upgrading to cs %s...\n", latest);
     int rc = system(cmd);
     free(tag);
@@ -673,8 +655,6 @@ int main(int argc, char **argv) {
     char *cflags = NULL;
     char *ldflags = NULL;
     char *cache_dir = NULL;
-    bool no_cache = false;
-    bool verbose = false;
 
     const char *source_path = NULL;
     int args_index = -1;
@@ -687,7 +667,7 @@ int main(int argc, char **argv) {
             }
             break;
         }
-        if (strcmp(arg, "--help") == 0) {
+        if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
             print_usage(stdout);
             return 0;
         }
@@ -696,42 +676,7 @@ int main(int argc, char **argv) {
             return 0;
         }
         if (strcmp(arg, "--update") == 0 || strcmp(arg, "-u") == 0) {
-            return perform_update(argv[0], verbose);
-        }
-        if (strcmp(arg, "--cc") == 0 && i + 1 < argc) {
-            cc = argv[++i];
-            continue;
-        }
-        if (strcmp(arg, "--cflags") == 0 && i + 1 < argc) {
-            if (!append_flag(&cflags, argv[++i])) {
-                fprintf(stderr, "Failed to append cflags\n");
-                return 1;
-            }
-            continue;
-        }
-        if (strcmp(arg, "--ldflags") == 0 && i + 1 < argc) {
-            if (!append_flag(&ldflags, argv[++i])) {
-                fprintf(stderr, "Failed to append ldflags\n");
-                return 1;
-            }
-            continue;
-        }
-        if (strcmp(arg, "--cache-dir") == 0 && i + 1 < argc) {
-            free(cache_dir);
-            cache_dir = dup_string(argv[++i]);
-            if (!cache_dir) {
-                fprintf(stderr, "Failed to set cache dir\n");
-                return 1;
-            }
-            continue;
-        }
-        if (strcmp(arg, "--no-cache") == 0) {
-            no_cache = true;
-            continue;
-        }
-        if (strcmp(arg, "--verbose") == 0) {
-            verbose = true;
-            continue;
+            return perform_update();
         }
         if (arg[0] == '-' && !source_path) {
             fprintf(stderr, "Unknown option: %s\n", arg);
@@ -762,12 +707,12 @@ int main(int argc, char **argv) {
         cache_dir = get_default_cache_dir();
     }
 
-    if (!cache_dir && !no_cache) {
+    if (!cache_dir) {
         fprintf(stderr, "Failed to resolve cache dir\n");
         return 1;
     }
 
-    if (!no_cache && !ensure_dir(cache_dir)) {
+    if (!ensure_dir(cache_dir)) {
         fprintf(stderr, "Failed to create cache dir: %s\n", cache_dir);
         return 1;
     }
@@ -787,19 +732,10 @@ int main(int argc, char **argv) {
 
     const char *base = path_basename(source_path);
     char output_path[PATH_MAX];
-    if (no_cache) {
-        snprintf(output_path, sizeof(output_path), "/tmp/cs-%s-%016llx", base,
-                 (unsigned long long)hash);
-    } else {
-        snprintf(output_path, sizeof(output_path), "%s/%s-%016llx", cache_dir,
-                 base, (unsigned long long)hash);
-    }
+    snprintf(output_path, sizeof(output_path), "%s/%s-%016llx", cache_dir, base,
+             (unsigned long long)hash);
 
-    bool need_compile = !file_exists(output_path) || no_cache;
-    if (verbose) {
-        fprintf(stderr, "%s: %s\n", need_compile ? "compile" : "cache",
-                output_path);
-    }
+    bool need_compile = !file_exists(output_path);
 
     if (need_compile) {
         char *exe_dir = get_exe_dir();
@@ -866,10 +802,6 @@ int main(int argc, char **argv) {
             }
             free(exe_dir);
             return 1;
-        }
-
-        if (verbose) {
-            fprintf(stderr, "%s\n", command);
         }
 
         int compile_status = system(command);
