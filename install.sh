@@ -2,16 +2,19 @@
 set -eu
 
 SPINNER_PID=""
+STEP_NUM=0
+STEP_TOTAL=5
 
 start_spinner() {
   msg="$1"
   spinner='-|/'
   i=1
-  printf "%s " "$msg"
+  STEP_NUM=$((STEP_NUM + 1))
+  printf "[%d/%d] %s " "$STEP_NUM" "$STEP_TOTAL" "$msg"
   (
     while :; do
       char=$(printf "%s" "$spinner" | cut -c "$i")
-      printf "\r%s %s" "$msg" "$char"
+      printf "\r[%d/%d] %s %s" "$STEP_NUM" "$STEP_TOTAL" "$msg" "$char"
       i=$((i + 1))
       if [ "$i" -gt 3 ]; then i=1; fi
       sleep 0.1
@@ -27,7 +30,7 @@ stop_spinner() {
     wait "$SPINNER_PID" 2>/dev/null || true
     SPINNER_PID=""
   fi
-  printf "\r%s\n" "$msg"
+  printf "\r[%d/%d] %s\n" "$STEP_NUM" "$STEP_TOTAL" "$msg"
 }
 
 run_step() {
