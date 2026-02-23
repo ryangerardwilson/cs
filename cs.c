@@ -1120,10 +1120,31 @@ int main(int argc, char **argv) {
         }
 
         char *compile_source = NULL;
+        char *compile_cflags = NULL;
         if (file_has_shebang(source_path)) {
             compile_source = strip_shebang_to_temp(source_path);
             if (!compile_source) {
                 fprintf(stderr, "Failed to preprocess shebang\n");
+                free(exe_dir);
+                return 1;
+            }
+            if (cflags) {
+                compile_cflags = dup_string(cflags);
+                if (!compile_cflags) {
+                    fprintf(stderr, "Failed to allocate cflags\n");
+                    unlink(compile_source);
+                    free(compile_source);
+                    free(exe_dir);
+                    return 1;
+                }
+            }
+            if (!append_flag(&compile_cflags, "-x c")) {
+                fprintf(stderr, "Failed to set shebang cflags\n");
+                if (compile_cflags) {
+                    free(compile_cflags);
+                }
+                unlink(compile_source);
+                free(compile_source);
                 free(exe_dir);
                 return 1;
             }
@@ -1132,12 +1153,16 @@ int main(int argc, char **argv) {
         const char *source_for_compile =
             compile_source ? compile_source : source_path;
         char *command = build_compile_command(
-            cc, include_path, cflags, source_for_compile, output_path, ldflags);
+            cc, include_path, compile_cflags ? compile_cflags : cflags,
+            source_for_compile, output_path, ldflags);
         if (!command) {
             fprintf(stderr, "Failed to build compile command\n");
             if (compile_source) {
                 unlink(compile_source);
                 free(compile_source);
+            }
+            if (compile_cflags) {
+                free(compile_cflags);
             }
             free(exe_dir);
             return 1;
@@ -1153,6 +1178,9 @@ int main(int argc, char **argv) {
         if (compile_source) {
             unlink(compile_source);
             free(compile_source);
+        }
+        if (compile_cflags) {
+            free(compile_cflags);
         }
 
         if (compile_status != 0) {
