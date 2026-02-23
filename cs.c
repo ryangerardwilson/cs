@@ -268,6 +268,55 @@ static char *read_file_text(const char *path) {
     return buffer;
 }
 
+static bool file_has_shebang(const char *path) {
+    FILE *file = fopen(path, "rb");
+    if (!file) {
+        return false;
+    }
+    int c1 = fgetc(file);
+    int c2 = fgetc(file);
+    fclose(file);
+    return c1 == '#' && c2 == '!';
+}
+
+static char *strip_shebang_to_temp(const char *path) {
+    FILE *in = fopen(path, "rb");
+    if (!in) {
+        return NULL;
+    }
+
+    char tmp_path[] = "/tmp/cs-src-XXXXXX";
+    int fd = mkstemp(tmp_path);
+    if (fd < 0) {
+        fclose(in);
+        return NULL;
+    }
+
+    FILE *out = fdopen(fd, "wb");
+    if (!out) {
+        close(fd);
+        unlink(tmp_path);
+        fclose(in);
+        return NULL;
+    }
+
+    bool first_line = true;
+    int ch = 0;
+    while ((ch = fgetc(in)) != EOF) {
+        if (first_line) {
+            if (ch == '\n') {
+                first_line = false;
+            }
+            continue;
+        }
+        fputc(ch, out);
+    }
+
+    fclose(in);
+    fclose(out);
+    return dup_string(tmp_path);
+}
+
 static bool write_text_file(const char *path, const char *text) {
     FILE *file = fopen(path, "wb");
     if (!file) {
@@ -1011,10 +1060,26 @@ int main(int argc, char **argv) {
             }
         }
 
+        char *compile_source = NULL;
+        if (file_has_shebang(source_path)) {
+            compile_source = strip_shebang_to_temp(source_path);
+            if (!compile_source) {
+                fprintf(stderr, "Failed to preprocess shebang\n");
+                free(exe_dir);
+                return 1;
+            }
+        }
+
+        const char *source_for_compile =
+            compile_source ? compile_source : source_path;
         char *command = build_compile_command(
-            cc, include_path, cflags, source_path, output_path, ldflags);
+            cc, include_path, cflags, source_for_compile, output_path, ldflags);
         if (!command) {
             fprintf(stderr, "Failed to build compile command\n");
+            if (compile_source) {
+                unlink(compile_source);
+                free(compile_source);
+            }
             free(exe_dir);
             return 1;
         }
@@ -1026,6 +1091,10 @@ int main(int argc, char **argv) {
         int compile_status = system(command);
         free(command);
         free(exe_dir);
+        if (compile_source) {
+            unlink(compile_source);
+            free(compile_source);
+        }
 
         if (compile_status != 0) {
             fprintf(stderr, "Compile failed (%d)\n", compile_status);
