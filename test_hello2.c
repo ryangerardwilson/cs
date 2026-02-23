@@ -4,6 +4,6 @@
 int main(int argc, char **argv) {
     (void)argc;
     (void)argv;
-    puts("hello from cs111");
+    puts("hello from cs115");
     return 0;
 }
