@@ -9,7 +9,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <sys/utsname.h>
 #include <unistd.h>
 
 #ifndef PATH_MAX
@@ -383,40 +382,6 @@ static char *json_find_string(const char *json, const char *key) {
     return value;
 }
 
-static char *json_find_asset_url(const char *json, const char *asset_name) {
-    size_t name_len = strlen(asset_name);
-    size_t pattern_len = name_len + 12;
-    char *pattern = (char *)malloc(pattern_len);
-    if (!pattern) {
-        return NULL;
-    }
-    snprintf(pattern, pattern_len, "\"name\":\"%s\"", asset_name);
-
-    const char *pos = strstr(json, pattern);
-    free(pattern);
-    if (!pos) {
-        return NULL;
-    }
-    const char *url_key = "\"browser_download_url\":\"";
-    const char *url_pos = strstr(pos, url_key);
-    if (!url_pos) {
-        return NULL;
-    }
-    url_pos += strlen(url_key);
-    const char *end = strchr(url_pos, '"');
-    if (!end) {
-        return NULL;
-    }
-    size_t len = (size_t)(end - url_pos);
-    char *value = (char *)malloc(len + 1);
-    if (!value) {
-        return NULL;
-    }
-    memcpy(value, url_pos, len);
-    value[len] = '\0';
-    return value;
-}
-
 static bool parse_semver(const char *version, int *major, int *minor,
                          int *patch) {
     if (!version || !major || !minor || !patch) {
@@ -441,95 +406,6 @@ static int compare_versions(const char *current, const char *latest) {
     if (cpat != lpat)
         return (cpat > lpat) ? 1 : -1;
     return 0;
-}
-
-static char *resolve_self_path(const char *argv0) {
-    char buffer[PATH_MAX];
-    ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
-    if (len > 0) {
-        buffer[len] = '\0';
-        return dup_string(buffer);
-    }
-    if (argv0 && strchr(argv0, '/')) {
-        return dup_string(argv0);
-    }
-    const char *path = getenv("PATH");
-    if (!path || !argv0) {
-        return NULL;
-    }
-    char *path_copy = dup_string(path);
-    if (!path_copy) {
-        return NULL;
-    }
-    char *saveptr = NULL;
-    for (char *dir = strtok_r(path_copy, ":", &saveptr); dir;
-         dir = strtok_r(NULL, ":", &saveptr)) {
-        snprintf(buffer, sizeof(buffer), "%s/%s", dir, argv0);
-        if (file_exists(buffer)) {
-            char *resolved = dup_string(buffer);
-            free(path_copy);
-            return resolved;
-        }
-    }
-    free(path_copy);
-    return NULL;
-}
-
-static char *detect_os_arch(char *os, size_t os_len, char *arch,
-                            size_t arch_len) {
-    struct utsname info;
-    if (uname(&info) != 0) {
-        return NULL;
-    }
-    const char *os_src = info.sysname;
-    if (strcmp(info.sysname, "Linux") == 0) {
-        os_src = "linux";
-    } else if (strcmp(info.sysname, "Darwin") == 0) {
-        os_src = "darwin";
-    }
-
-    if (strlen(os_src) >= os_len) {
-        return NULL;
-    }
-    strcpy(os, os_src);
-
-    const char *arch_src = info.machine;
-    if (strcmp(info.machine, "x86_64") == 0) {
-        arch_src = "amd64";
-    } else if (strcmp(info.machine, "aarch64") == 0 ||
-               strcmp(info.machine, "arm64") == 0) {
-        arch_src = "arm64";
-    }
-
-    if (strlen(arch_src) >= arch_len) {
-        return NULL;
-    }
-    strcpy(arch, arch_src);
-    return os;
-}
-
-static bool copy_file(const char *src, const char *dst) {
-    FILE *in = fopen(src, "rb");
-    if (!in) {
-        return false;
-    }
-    FILE *out = fopen(dst, "wb");
-    if (!out) {
-        fclose(in);
-        return false;
-    }
-    char buffer[8192];
-    size_t read_count = 0;
-    while ((read_count = fread(buffer, 1, sizeof(buffer), in)) > 0) {
-        if (fwrite(buffer, 1, read_count, out) != read_count) {
-            fclose(in);
-            fclose(out);
-            return false;
-        }
-    }
-    fclose(in);
-    fclose(out);
-    return true;
 }
 
 static const char *get_config_dir(void) {
@@ -716,6 +592,7 @@ static void ensure_completion_ready(void) {
 }
 
 static int perform_update(const char *argv0, bool verbose) {
+    (void)argv0;
     const char *owner = getenv("CS_REPO_OWNER");
     const char *repo = getenv("CS_REPO_NAME");
     if (!owner || owner[0] == '\0') {
@@ -729,6 +606,15 @@ static int perform_update(const char *argv0, bool verbose) {
         return 1;
     }
 
+    char install_url[512];
+    snprintf(install_url, sizeof(install_url),
+             "https://raw.githubusercontent.com/%s/%s/main/install.sh", owner,
+             repo);
+
+    char cmd[1024];
+    snprintf(cmd, sizeof(cmd), "curl -fsSL \"%s\" | CS_REPO=%s/%s sh",
+             install_url, owner, repo);
+
     char api_url[512];
     snprintf(api_url, sizeof(api_url),
              "https://api.github.com/repos/%s/%s/releases/latest", owner, repo);
@@ -737,15 +623,23 @@ static int perform_update(const char *argv0, bool verbose) {
     snprintf(curl_cmd, sizeof(curl_cmd), "curl -fsSL \"%s\"", api_url);
     char *json = read_command_output(curl_cmd);
     if (!json) {
-        fprintf(stderr, "Failed to fetch release info\n");
-        return 1;
+        fprintf(stderr,
+                "Unable to determine latest version; attempting upgrade...\n");
+        if (verbose) {
+            fprintf(stderr, "%s\n", cmd);
+        }
+        return system(cmd);
     }
 
     char *tag = json_find_string(json, "tag_name");
     if (!tag) {
-        fprintf(stderr, "Failed to parse release tag\n");
+        fprintf(stderr,
+                "Unable to determine latest version; attempting upgrade...\n");
         free(json);
-        return 1;
+        if (verbose) {
+            fprintf(stderr, "%s\n", cmd);
+        }
+        return system(cmd);
     }
 
     const char *latest = tag;
@@ -763,209 +657,15 @@ static int perform_update(const char *argv0, bool verbose) {
         }
     }
 
-    char os[64];
-    char arch[64];
-    if (!detect_os_arch(os, sizeof(os), arch, sizeof(arch))) {
-        fprintf(stderr, "Failed to detect platform\n");
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    char asset_name[256];
-    char checksum_name[320];
-    int asset_written =
-        snprintf(asset_name, sizeof(asset_name), "cs-%s-%s", os, arch);
-    if (asset_written < 0 || (size_t)asset_written >= sizeof(asset_name)) {
-        fprintf(stderr, "Platform string too long\n");
-        free(tag);
-        free(json);
-        return 1;
-    }
-    int checksum_written =
-        snprintf(checksum_name, sizeof(checksum_name), "%s.sha256", asset_name);
-    if (checksum_written < 0 ||
-        (size_t)checksum_written >= sizeof(checksum_name)) {
-        fprintf(stderr, "Checksum name too long\n");
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    char *asset_url = json_find_asset_url(json, asset_name);
-    char *checksum_url = json_find_asset_url(json, checksum_name);
-    if (!asset_url || !checksum_url) {
-        fprintf(stderr, "Release asset not found for %s/%s\n", os, arch);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    char tmp_path[] = "/tmp/cs-update-XXXXXX";
-    int tmp_fd = mkstemp(tmp_path);
-    if (tmp_fd < 0) {
-        fprintf(stderr, "Failed to create temp file\n");
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-    close(tmp_fd);
-
-    char checksum_path[] = "/tmp/cs-update-sha-XXXXXX";
-    int checksum_fd = mkstemp(checksum_path);
-    if (checksum_fd < 0) {
-        fprintf(stderr, "Failed to create checksum file\n");
-        unlink(tmp_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-    close(checksum_fd);
-
-    char download_cmd[1024];
-    snprintf(download_cmd, sizeof(download_cmd), "curl -fsSL -o \"%s\" \"%s\"",
-             tmp_path, asset_url);
     if (verbose) {
-        fprintf(stderr, "%s\n", download_cmd);
-    }
-    if (system(download_cmd) != 0) {
-        fprintf(stderr, "Failed to download update\n");
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
+        fprintf(stderr, "%s\n", cmd);
     }
 
-    char checksum_cmd[1024];
-    snprintf(checksum_cmd, sizeof(checksum_cmd), "curl -fsSL -o \"%s\" \"%s\"",
-             checksum_path, checksum_url);
-    if (system(checksum_cmd) != 0) {
-        fprintf(stderr, "Failed to download checksum\n");
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    char *checksum_text = read_file_text(checksum_path);
-    if (!checksum_text) {
-        fprintf(stderr, "Failed to read checksum\n");
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    char expected_hash[128] = {0};
-    if (sscanf(checksum_text, "%127s", expected_hash) != 1) {
-        fprintf(stderr, "Invalid checksum file\n");
-        free(checksum_text);
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    free(checksum_text);
-
-    char hash_cmd[1024];
-    snprintf(hash_cmd, sizeof(hash_cmd), "sha256sum \"%s\"", tmp_path);
-    char *hash_out = read_command_output(hash_cmd);
-    if (!hash_out) {
-        snprintf(hash_cmd, sizeof(hash_cmd), "shasum -a 256 \"%s\"", tmp_path);
-        hash_out = read_command_output(hash_cmd);
-    }
-    if (!hash_out) {
-        fprintf(stderr, "sha256 tool not available\n");
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    char actual_hash[128] = {0};
-    if (sscanf(hash_out, "%127s", actual_hash) != 1) {
-        fprintf(stderr, "Failed to read hash\n");
-        free(hash_out);
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-    free(hash_out);
-
-    if (strcmp(actual_hash, expected_hash) != 0) {
-        fprintf(stderr, "Checksum mismatch\n");
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    chmod(tmp_path, 0755);
-
-    char *self_path = resolve_self_path(argv0);
-    if (!self_path) {
-        fprintf(stderr, "Failed to resolve current binary path\n");
-        unlink(tmp_path);
-        unlink(checksum_path);
-        free(asset_url);
-        free(checksum_url);
-        free(tag);
-        free(json);
-        return 1;
-    }
-
-    if (rename(tmp_path, self_path) != 0) {
-        if (!copy_file(tmp_path, self_path)) {
-            fprintf(stderr, "Failed to replace binary: %s\n", strerror(errno));
-            free(self_path);
-            unlink(tmp_path);
-            unlink(checksum_path);
-            free(asset_url);
-            free(checksum_url);
-            free(tag);
-            free(json);
-            return 1;
-        }
-        unlink(tmp_path);
-    }
-
-    unlink(checksum_path);
-    printf("Updated to cs %s\n", latest);
-    free(self_path);
-    free(asset_url);
-    free(checksum_url);
+    printf("Upgrading to cs %s...\n", latest);
+    int rc = system(cmd);
     free(tag);
     free(json);
-    return 0;
+    return rc;
 }
 
 int main(int argc, char **argv) {
