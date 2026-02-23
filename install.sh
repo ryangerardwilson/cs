@@ -107,9 +107,9 @@ SCRIPT_URL="https://raw.githubusercontent.com/${REPO}/main/scripts/find-release-
 
 if command -v python3 >/dev/null 2>&1; then
   if [ -n "$TOKEN" ]; then
-    run_step_capture "Fetching release metadata" URLS sh -c "GITHUB_TOKEN=\"$TOKEN\" curl -fsSL \"$SCRIPT_URL\" | GITHUB_TOKEN=\"$TOKEN\" python3 - \"$API_URL\" \"$ASSET\" \"$CHECKSUM\"" || exit 1
+    run_step_capture "Fetching release metadata" URLS sh -c "CS_HELPER_SILENT=1 GITHUB_TOKEN=\"$TOKEN\" curl -fsSL \"$SCRIPT_URL\" | CS_HELPER_SILENT=1 GITHUB_TOKEN=\"$TOKEN\" python3 - \"$API_URL\" \"$ASSET\" \"$CHECKSUM\"" || exit 1
   else
-    run_step_capture "Fetching release metadata" URLS sh -c "curl -fsSL \"$SCRIPT_URL\" | python3 - \"$API_URL\" \"$ASSET\" \"$CHECKSUM\"" || exit 1
+    run_step_capture "Fetching release metadata" URLS sh -c "CS_HELPER_SILENT=1 curl -fsSL \"$SCRIPT_URL\" | CS_HELPER_SILENT=1 python3 - \"$API_URL\" \"$ASSET\" \"$CHECKSUM\"" || exit 1
   fi
   URL=$(printf "%s" "$URLS" | sed -n '1p')
   CHECKSUM_URL=$(printf "%s" "$URLS" | sed -n '2p')
