@@ -835,7 +835,7 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    exec_argv[0] = output_path;
+    exec_argv[0] = (char *)source_path;
     if (args_index > 0) {
         for (int i = args_index; i < argc; i++) {
             exec_argv[i - args_index + 1] = argv[i];
