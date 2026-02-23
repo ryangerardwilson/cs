@@ -835,11 +835,13 @@ int main(int argc, char **argv) {
         return 1;
     }
 
-    exec_argv[0] = (char *)source_path;
     if (args_index > 0) {
-        for (int i = args_index; i < argc; i++) {
-            exec_argv[i - args_index + 1] = argv[i];
+        exec_argv[0] = argv[args_index];
+        for (int i = args_index + 1; i < argc; i++) {
+            exec_argv[i - args_index] = argv[i];
         }
+    } else {
+        exec_argv[0] = (char *)source_path;
     }
     exec_argv[exec_argc] = NULL;
 
