@@ -663,22 +663,24 @@ int main(int argc, char **argv) {
         const char *arg = argv[i];
         if (strcmp(arg, "--") == 0) {
             if (i + 1 < argc) {
+                source_path = argv[i + 1];
                 args_index = i + 1;
             }
             break;
         }
-        if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
-            print_usage(stdout);
-            return 0;
-        }
-        if (strcmp(arg, "--version") == 0 || strcmp(arg, "-v") == 0) {
-            printf("cs %s\n", CS_VERSION);
-            return 0;
-        }
-        if (strcmp(arg, "--update") == 0 || strcmp(arg, "-u") == 0) {
-            return perform_update();
-        }
-        if (arg[0] == '-' && !source_path) {
+
+        if (!source_path && arg[0] == '-') {
+            if (strcmp(arg, "--help") == 0 || strcmp(arg, "-h") == 0) {
+                print_usage(stdout);
+                return 0;
+            }
+            if (strcmp(arg, "--version") == 0 || strcmp(arg, "-v") == 0) {
+                printf("cs %s\n", CS_VERSION);
+                return 0;
+            }
+            if (strcmp(arg, "--update") == 0 || strcmp(arg, "-u") == 0) {
+                return perform_update();
+            }
             fprintf(stderr, "Unknown option: %s\n", arg);
             return 1;
         }
@@ -688,6 +690,7 @@ int main(int argc, char **argv) {
             if (i + 1 < argc) {
                 args_index = i + 1;
             }
+            break;
         }
     }
 
