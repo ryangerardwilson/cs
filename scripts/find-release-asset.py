@@ -66,9 +66,6 @@ def main() -> int:
         sys.stderr.write(f"Failed to parse release JSON: {exc}\n")
         return 1
 
-    if os.environ.get("CS_HELPER_SILENT") != "1":
-        sys.stderr.write(f"Release tag: {release.get('tag_name', 'Unknown')}\n")
-        sys.stderr.write(f"Number of assets: {len(release.get('assets', []))}\n")
 
     assets = {asset.get("name"): asset.get("browser_download_url", "")
               for asset in release.get("assets", [])}
