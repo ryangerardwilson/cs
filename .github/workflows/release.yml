@@ -28,8 +28,13 @@ jobs:
           VERSION="${TAG#v}"
           echo "CS_VERSION=${VERSION}" >> "$GITHUB_ENV"
 
+      - name: Stamp runtime version
+        shell: bash
+        run: |
+          printf '__version__ = "%s"\n' "${CS_VERSION}" > _version.py
+
       - name: Build
-        run: make CS_VERSION="${CS_VERSION}"
+        run: make OUT=bin_cs
 
       - name: Package
         shell: bash

@@ -1,13 +1,17 @@
 CC ?= cc
 CFLAGS ?= -O2 -Wall -Wextra -std=c11
-CS_VERSION ?= $(shell cat VERSION)
+OUT ?= bin_cs
+CS_VERSION ?= $(shell sed -n 's/^__version__ = \"\\(.*\\)\"$$/\\1/p' _version.py)
 CS_REPO_OWNER ?=
 CS_REPO_NAME ?=
 CFLAGS += -DCS_VERSION=\"$(CS_VERSION)\" -DCS_REPO_OWNER=\"$(CS_REPO_OWNER)\" -DCS_REPO_NAME=\"$(CS_REPO_NAME)\"
 
-bin_cs: cs.c
+all: $(OUT)
+
+$(OUT): cs.c
+	@mkdir -p $(dir $@)
 	$(CC) $(CFLAGS) -o $@ $<
 
-.PHONY: clean
+.PHONY: all clean
 clean:
 	rm -f bin_cs

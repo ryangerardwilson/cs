@@ -13,7 +13,13 @@ portability, and single-binary output.
 ## Install
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/cs/main/install.sh | CS_REPO=ryangerardwilson/cs sh
+curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/cs/main/install.sh | bash
+```
+
+Install a specific version:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/cs/main/install.sh | bash -s -- -v 0.1.0
 ```
 
 ## Build
@@ -22,7 +28,7 @@ curl -fsSL https://raw.githubusercontent.com/ryangerardwilson/cs/main/install.sh
 make
 ```
 
-Binary: `cs`
+Binary: `bin_cs`
 
 ## Usage
 
@@ -55,17 +61,22 @@ chmod +x test_hello.c
 
 ## Versioning
 
-Release builds use the git tag as the version (tags like `v0.1.1`).
+`cs -v` prints the installed app version from the runtime `_version.py`
+source. The checked-in file stays at `0.0.0`; tagged release automation stamps
+the shipped binary with the real version.
 
 ## Update
 
-`cs -u` runs the GitHub install script under the hood. Set `CS_REPO_OWNER`
-and `CS_REPO_NAME`, or `CS_REPO=owner/repo`.
+`cs -u` delegates to `install.sh -u`.
+
+```sh
+cs -v
+cs -u
+```
 
 ## Install requirements
 
-`install.sh` requires `python3`. For private repos or rate-limited API calls,
-export `GITHUB_TOKEN` or `GH_TOKEN`.
+`install.sh` requires `curl` plus `sha256sum` or `shasum`.
 
 ## Helper header
 

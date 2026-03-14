@@ -16,7 +16,7 @@
 #endif
 
 #ifndef CS_VERSION
-#define CS_VERSION "dev"
+#define CS_VERSION "0.0.0"
 #endif
 
 #ifndef CS_REPO_OWNER
@@ -604,7 +604,7 @@ static int perform_update(void) {
              repo);
 
     char cmd[1024];
-    snprintf(cmd, sizeof(cmd), "curl -fsSL \"%s\" | CS_REPO=%s/%s sh",
+    snprintf(cmd, sizeof(cmd), "curl -fsSL \"%s\" | CS_REPO=%s/%s sh -s -- -u",
              install_url, owner, repo);
 
     char api_url[512];
@@ -633,14 +633,12 @@ static int perform_update(void) {
         latest = tag + 1;
     }
 
-    if (strcmp(CS_VERSION, "dev") != 0) {
-        int cmp = compare_versions(CS_VERSION, latest);
-        if (cmp >= 0) {
-            printf("cs %s already up to date\n", CS_VERSION);
-            free(tag);
-            free(json);
-            return 0;
-        }
+    int cmp = compare_versions(CS_VERSION, latest);
+    if (cmp >= 0) {
+        printf("cs %s already up to date\n", CS_VERSION);
+        free(tag);
+        free(json);
+        return 0;
     }
 
     printf("Upgrading to cs %s...\n", latest);
@@ -675,7 +673,7 @@ int main(int argc, char **argv) {
                 return 0;
             }
             if (strcmp(arg, "--version") == 0 || strcmp(arg, "-v") == 0) {
-                printf("cs %s\n", CS_VERSION);
+                printf("%s\n", CS_VERSION);
                 return 0;
             }
             if (strcmp(arg, "--update") == 0 || strcmp(arg, "-u") == 0) {
